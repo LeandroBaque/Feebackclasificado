@@ -48,7 +48,8 @@ def analyze_feedback(text: str) -> dict:
                 "score": sentiment_result.get("score")
             },
             "urgency": {
-                "label": urgency_result
+                "label": urgency_result.get("label"),
+                "score": urgency_result.get("score")
             },
             "category": {
                 "label": category_result.get("label"),

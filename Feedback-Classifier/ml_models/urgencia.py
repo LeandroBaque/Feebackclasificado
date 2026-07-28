@@ -87,12 +87,12 @@ def load_urgency_model():
         URGENCY_CLASSIFIER = None
 
 
-def classify_urgency(text: str) -> str:
-    """Clasifica urgencia usando modelo ML o keywords como fallback"""
+def classify_urgency(text: str) -> dict:
+    """Clasifica urgencia usando modelo ML o keywords como fallback."""
     global URGENCY_CLASSIFIER
     
     if not text or not isinstance(text, str):
-        return "baja"
+        return {"label": "baja", "score": 0.0}
     
     text_clean = text.lower().strip()
     
@@ -112,53 +112,49 @@ def classify_urgency(text: str) -> str:
                 scores = result[0] if isinstance(result[0], list) else result
                 
                 # Buscar el score más alto
-                max_score = 0
+                max_score = 0.0
                 predicted_label = "POSITIVE"
                 
                 for item in scores:
-                    if item['score'] > max_score:
-                        max_score = item['score']
-                        predicted_label = item['label']
+                    if item["score"] > max_score:
+                        max_score = item["score"]
+                        predicted_label = item["label"]
                 
-                # Mapeo: NEGATIVE sentiment = ALTA urgencia
                 if predicted_label == "NEGATIVE" and max_score > 0.7:
                     logger.info(f"[ML_Urgency] HF: {predicted_label} ({max_score:.3f}) -> ALTA")
-                    return "alta"
+                    return {"label": "alta", "score": float(max_score)}
                 elif predicted_label == "NEGATIVE" and max_score > 0.5:
                     logger.info(f"[ML_Urgency] HF: {predicted_label} ({max_score:.3f}) -> MEDIA")
-                    return "media"
+                    return {"label": "media", "score": float(max_score)}
                 else:
                     logger.info(f"[ML_Urgency] HF: {predicted_label} ({max_score:.3f}) -> BAJA")
-                    # Continuar con keywords como backup
-                    
+                    # No retornamos de inmediato aquí porque queremos permitir
+                    # que el fallback por keywords aún pueda detectar urgencia.
+                    pass
         except Exception as e:
             logger.error(f"[ML_Urgency] Error en HF, usando keywords: {e}")
     
     # ✅ FALLBACK CON KEYWORDS (mejorado)
-    text_words = text_clean.split()
-    
-    # Contar matches de keywords
     alta_matches = sum(1 for keyword in KEYWORDS_URGENCIA_ALTA 
                       if keyword.lower() in text_clean)
     media_matches = sum(1 for keyword in KEYWORDS_URGENCIA_MEDIA 
                        if keyword.lower() in text_clean)
     
-    # Lógica de decisión mejorada
     if alta_matches >= 2:
         logger.info(f"[ML_Urgency] Keywords: ALTA ({alta_matches} matches)")
-        return "alta"
+        return {"label": "alta", "score": 0.95}
     elif alta_matches >= 1:
         logger.info(f"[ML_Urgency] Keywords: ALTA (1 match crítico)")
-        return "alta"
+        return {"label": "alta", "score": 0.8}
     elif media_matches >= 2:
         logger.info(f"[ML_Urgency] Keywords: MEDIA ({media_matches} matches)")
-        return "media"
+        return {"label": "media", "score": 0.65}
     elif media_matches >= 1:
         logger.info(f"[ML_Urgency] Keywords: MEDIA (1 match)")
-        return "media"
+        return {"label": "media", "score": 0.5}
     else:
         logger.info("[ML_Urgency] Keywords: BAJA (sin matches)")
-        return "baja"
+        return {"label": "baja", "score": 0.3}
 
 
 def get_urgencia(texto: str) -> str:

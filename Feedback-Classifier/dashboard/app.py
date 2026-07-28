@@ -1,6 +1,5 @@
 import os
 import json
-import sqlite3
 
 import requests
 import pandas as pd
@@ -8,6 +7,10 @@ import plotly.express as px
 import streamlit as st
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/api/feedback/submit")
+API_BASE_URL = os.getenv("API_BASE_URL")
+if not API_BASE_URL:
+    API_BASE_URL = API_URL.rsplit("/feedback/submit", 1)[0]
+API_DATA_URL = f"{API_BASE_URL}/feedback/data"
 
 # ⚙️ Config general
 st.set_page_config(
@@ -54,14 +57,19 @@ TOPIC_COLORS = px.colors.qualitative.Vivid
 
 # -------------- UTILIDADES DB ----------------
 def load_feedback_df() -> pd.DataFrame:
-    """Carga todos los registros de feedback desde SQLite."""
-    if not os.path.exists("feedback.db"):
+    """Carga todos los registros de feedback desde el endpoint de la API."""
+    try:
+        response = requests.get(API_DATA_URL, timeout=20)
+        response.raise_for_status()
+        records = response.json()
+    except Exception as exc:
+        st.error(f"❌ No se pudo cargar el feedback desde la API: {exc}")
         return pd.DataFrame()
 
-    conn = sqlite3.connect("feedback.db")
-    df = pd.read_sql_query("SELECT * FROM feedback", conn)
-    conn.close()
-    return df
+    if not records:
+        return pd.DataFrame()
+
+    return pd.DataFrame(records)
 
 
 # -------------- SIDEBAR: TEST API --------------

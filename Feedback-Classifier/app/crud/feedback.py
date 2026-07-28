@@ -13,6 +13,7 @@ def save_feedback(data, ml):
         sentiment_label=ml["analysis"]["sentiment"]["label"],
         sentiment_score=ml["analysis"]["sentiment"]["score"],
         urgency_label=ml["analysis"]["urgency"]["label"],
+        urgency_score=ml["analysis"]["urgency"]["score"],
         category_label=ml["analysis"]["category"]["label"],
         category_score=ml["analysis"]["category"]["score"],
         analyzed_at=datetime.utcnow()

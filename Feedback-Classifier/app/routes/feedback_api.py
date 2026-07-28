@@ -14,6 +14,28 @@ class FeedbackInput(BaseModel):
     source_id: int
     external_id: str | None = None
 
+
+def feedback_to_dict(feedback: Feedback) -> dict:
+    return {
+        "id": feedback.id,
+        "text_original": feedback.text_original,
+        "source_id": feedback.source_id,
+        "external_id": feedback.external_id,
+        "channel": feedback.channel,
+        "text_clean": feedback.text_clean,
+        "received_at": feedback.received_at.isoformat() if feedback.received_at else None,
+        "analyzed_at": feedback.analyzed_at.isoformat() if feedback.analyzed_at else None,
+        "sentiment_label": feedback.sentiment_label,
+        "sentiment_score": feedback.sentiment_score,
+        "urgency_label": feedback.urgency_label,
+        "urgency_score": feedback.urgency_score,
+        "category_label": feedback.category_label,
+        "category_score": feedback.category_score,
+        "is_training_sample": feedback.is_training_sample,
+        "extra_metadata": feedback.extra_metadata,
+        "created_by": feedback.created_by,
+    }
+
 # --- SCRUM 27 ---
 @router.post("/feedback/submit")
 def submit_feedback(data: FeedbackInput):
@@ -39,7 +61,8 @@ def get_feedback(sentiment: str | None = None,
     if urgency:
         q = q.filter(Feedback.urgency_label == urgency)
 
-    return q.order_by(Feedback.analyzed_at.desc()).limit(limit).all()
+    rows = q.order_by(Feedback.analyzed_at.desc()).limit(limit).all()
+    return [feedback_to_dict(row) for row in rows]
 
 
 # --- SCRUM 29 ---
@@ -86,12 +109,12 @@ def export_feedback():
         w = csv.writer(f)
         w.writerow([
             "id","text_original","sentiment_label","sentiment_score",
-            "urgency_label","category_label","category_score","received_at"
+            "urgency_label","urgency_score","category_label","category_score","received_at"
         ])
         for r in rows:
             w.writerow([
                 r.id, r.text_original, r.sentiment_label, r.sentiment_score,
-                r.urgency_label, r.category_label, r.category_score, r.received_at
+                r.urgency_label, r.urgency_score, r.category_label, r.category_score, r.received_at
             ])
 
     return FileResponse(tmp.name, filename="feedback_export.csv")

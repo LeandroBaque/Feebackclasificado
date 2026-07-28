@@ -4,17 +4,23 @@
 KEYWORDS_URGENCIA_ALTA = [
     "roto", "no funciona", "desastre", "caído", "error fatal",
     "urgente", "inmediato", "no puedo trabajar", "estafa",
-    "fraude", "no acceso"
+    "fraude", "no acceso", "crítico", "emergencia", "bloqueado",
+    "perdí", "robaron", "hackear", "urgent", "critical",
+    "emergency", "broken", "crashed", "down", "failed",
+    "disaster", "help", "asap", "immediately"
 ]
 
 KEYWORDS_URGENCIA_MEDIA = [
     "lento", "tarda mucho", "problema", "ayuda", "duda",
-    "consulta", "pregunta", "mejorar", "sugerencia"
+    "consulta", "pregunta", "mejorar", "sugerencia", "demora",
+    "retraso", "confuso", "difícil", "complicado", "issue",
+    "slow", "delay", "question", "support", "confused",
+    "problem", "bug", "error"
 ]
 
 
 # 2. LA FUNCIÓN CLASIFICADORA (entregable)
-def classify_urgency(text: str) -> str:
+def classify_urgency(text: str) -> dict:
     """
     Clasifica la urgencia de un texto basado en keywords predefinidas.
 
@@ -22,24 +28,26 @@ def classify_urgency(text: str) -> str:
         text (str): El feedback del cliente.
 
     Returns:
-        str: La etiqueta de urgencia ('ALTA', 'MEDIA', 'BAJA').
+        dict: Un diccionario con 'label' y 'score'.
     """
     if not text or not isinstance(text, str):
-        return "BAJA"
+        return {"label": "BAJA", "score": 0.0}
 
-    # Convertimos a minúscula para una búsqueda 'case-insensitive'
     text_lower = text.lower()
 
-    # Buscamos primero las keywords de alta urgencia
-    if any(keyword in text_lower for keyword in KEYWORDS_URGENCIA_ALTA):
-        return "ALTA"
+    alta_matches = sum(1 for keyword in KEYWORDS_URGENCIA_ALTA if keyword in text_lower)
+    media_matches = sum(1 for keyword in KEYWORDS_URGENCIA_MEDIA if keyword in text_lower)
 
-    # Si no, buscamos las de media urgencia
-    if any(keyword in text_lower for keyword in KEYWORDS_URGENCIA_MEDIA):
-        return "MEDIA"
-
-    # Si no encuentra nada, es urgencia baja
-    return "BAJA"
+    if alta_matches >= 2:
+        return {"label": "ALTA", "score": 0.95}
+    elif alta_matches >= 1:
+        return {"label": "ALTA", "score": 0.8}
+    elif media_matches >= 2:
+        return {"label": "MEDIA", "score": 0.65}
+    elif media_matches >= 1:
+        return {"label": "MEDIA", "score": 0.5}
+    else:
+        return {"label": "BAJA", "score": 0.3}
 
 # 3. PRUEBA RÁPIDA (Para probar el archivo)
 if __name__ == "__main__":
