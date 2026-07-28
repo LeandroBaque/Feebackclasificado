@@ -1,0 +1,127 @@
+from transformers import pipeline, AutoModelForSequenceClassification, AutoTokenizer
+import os
+import torch
+import requests
+import zipfile
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+print("[ML_Category] Cargando especialista de categoría...")
+
+LABEL_MAP_CATEGORY = {
+    0: "Soporte Técnico",
+    1: "Facturación y Pagos",
+    2: "Producto/Sugerencias",
+    3: "Logística/Envíos",
+    4: "General/Otro"
+}
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH_CATEGORY = os.path.join(BASE_DIR, "..", "model_files", "category_model")
+
+def download_model_if_needed():
+    """Descarga automáticamente desde Backblaze B2 (OPTIMIZADO)"""
+    config_path = os.path.join(MODEL_PATH_CATEGORY, "config.json")
+    if os.path.exists(config_path):
+        print("[ML_Category] ✅ Modelo ya existe - usando cache")
+        return True
+    
+    print("[ML_Category] 📦 Descargando modelo desde Backblaze B2...")
+    
+    # TU URL REAL DE BACKBLAZE B2
+    BACKBLAZE_URL = "https://f005.backblazeb2.com/file/Modelosml/modelo_categoria_final.zip"
+    
+    try:
+        Path(MODEL_PATH_CATEGORY).parent.mkdir(parents=True, exist_ok=True)
+        
+        print(f"[ML_Category] 📥 Descargando (404.6 MB) desde Backblaze...")
+        response = requests.get(BACKBLAZE_URL, stream=True, timeout=300)
+        response.raise_for_status()
+        
+        zip_path = os.path.join(BASE_DIR, "..", "temp_model.zip")
+        
+        # Descarga con progreso
+        total_size = int(response.headers.get('content-length', 0))
+        downloaded = 0
+        
+        with open(zip_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=1024*1024):
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0:
+                        progress = (downloaded / total_size) * 100
+                        print(f"\r[ML_Category] Progreso: {progress:.1f}%", end='')
+        
+        print()  # Nueva línea
+        
+        # Verificar descarga
+        file_size = os.path.getsize(zip_path)
+        print(f"[ML_Category] ✅ Descargado: {file_size/(1024*1024):.1f} MB")
+        
+        if not zipfile.is_zipfile(zip_path):
+            print("[ML_Category] ❌ ERROR: No es ZIP válido")
+            os.remove(zip_path)
+            return False
+        
+        # Extraer
+        print("[ML_Category] 📂 Extrayendo...")
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(os.path.join(BASE_DIR, "..", "model_files"))
+        
+        os.remove(zip_path)  # Limpiar (respeta .gitignore)
+        print("[ML_Category] ✅ Modelo listo desde Backblaze B2")
+        return True
+        
+    except Exception as e:
+        print(f"[ML_Category] ❌ Error: {e}")
+        return False
+
+# Descargar modelo
+download_success = download_model_if_needed()
+
+# Cargar modelo (resto igual)
+try:
+    if download_success:
+        print(f"[ML_Category] Cargando desde: {MODEL_PATH_CATEGORY}")
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_PATH_CATEGORY)
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH_CATEGORY)
+        
+        CATEGORY_CLASSIFIER = pipeline(
+            task="text-classification",
+            model=model,
+            tokenizer=tokenizer
+        )
+        print("[ML_Category] ¡Modelo cargado desde Backblaze B2!")
+    else:
+        raise Exception("Falló descarga desde Backblaze B2")
+except Exception as e:
+    print(f"[ML_Category] ERROR: {e}")
+    CATEGORY_CLASSIFIER = None
+
+def classify_category(text: str) -> dict:
+    """Función clasificadora (IGUAL QUE ANTES)"""
+    if CATEGORY_CLASSIFIER is None:
+        return {"label": "ERROR_MODEL_NOT_LOADED", "score": 0.0}
+    if not text or not isinstance(text, str):
+        return {"label": "ERROR_INVALID_INPUT", "score": 0.0}
+        
+    try:
+        result_raw = CATEGORY_CLASSIFIER(text)[0]
+        label_id_str = result_raw['label']
+        label_id_int = int(label_id_str.split('_')[-1]) 
+        clean_label = LABEL_MAP_CATEGORY.get(label_id_int, "UNKNOWN") 
+        return {"label": clean_label, "score": result_raw['score']}
+    except Exception as e:
+        print(f"[ML_Category] Error: {e}")
+        return {"label": "ERROR_CLASSIFICATION", "score": 0.0}
+
+# Prueba (IGUAL QUE ANTES)
+if __name__ == "__main__":
+    print("\n--- PRUEBA INDIVIDUAL DE CATEGORÍA ---")
+    test_1 = "No me funciona la clave para entrar"
+    test_2 = "El repartidor nunca llegó a mi casa"
+    print(f"Texto: '{test_1}' -> Resultado: {classify_category(test_1)}")
+    print(f"Texto: '{test_2}' -> Resultado: {classify_category(test_2)}")
