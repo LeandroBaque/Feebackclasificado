@@ -1,0 +1,28 @@
+# feedback-classifier/Dockerfile.dashboard
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Sistema básico
+RUN apt-get update && apt-get install -y curl unzip && \
+    rm -rf /var/lib/apt/lists/* && apt-get clean
+
+# ✅ USAR requirements.txt con versiones fijadas
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt \
+    --index-url https://download.pytorch.org/whl/cpu \
+    --extra-index-url https://pypi.org/simple
+
+# Código
+COPY Feedback-Classifier/app/ ./app/
+COPY Feedback-Classifier/ml_models/ ./ml_models/
+
+# Directorio para modelos
+RUN mkdir -p model_files
+
+# Configuración
+ENV DATABASE_URL=sqlite:///./feedback.db
+ENV PYTHONPATH=/app
+
+EXPOSE 8000
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
